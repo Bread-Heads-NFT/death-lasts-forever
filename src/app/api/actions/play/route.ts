@@ -1,0 +1,100 @@
+/**
+ * Solana Actions Example
+ */
+
+import {
+  ActionPostResponse,
+  ACTIONS_CORS_HEADERS,
+  createPostResponse,
+  ActionGetResponse,
+  ActionPostRequest,
+} from "@solana/actions";
+import {
+  clusterApiUrl,
+  ComputeBudgetProgram,
+  Connection,
+  PublicKey as Web3JsPublicKey,
+  Transaction,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import {
+  fromWeb3JsPublicKey,
+  toWeb3JsKeypair,
+  toWeb3JsLegacyTransaction,
+  toWeb3JsPublicKey,
+  toWeb3JsTransaction,
+} from "@metaplex-foundation/umi-web3js-adapters"
+import { createNoopSigner, generateSigner, PublicKey } from "@metaplex-foundation/umi";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import { create, mplCore } from "@metaplex-foundation/mpl-core";
+
+export const GET = async (req: Request) => {
+  const payload: ActionGetResponse = {
+    title: "Play Nuke Foot Cockroach",
+    icon: new URL("/nuke-foot-cockroach.png", new URL(req.url).origin).toString(),
+    description: "Mint an NFT to participate in this deadly twist on Rock Paper Scissors. If you win, you get to play again. If you lose, you die and the NFT is burned.",
+    label: "Mint & Play",
+  };
+
+  return Response.json(payload, {
+    headers: ACTIONS_CORS_HEADERS,
+  });
+};
+
+// DO NOT FORGET TO INCLUDE THE `OPTIONS` HTTP METHOD
+// THIS WILL ENSURE CORS WORKS FOR BLINKS
+export const OPTIONS = GET;
+
+export const POST = async (req: Request) => {
+  try {
+    const body: ActionPostRequest = await req.json();
+
+    let account: PublicKey;
+    try {
+      account = fromWeb3JsPublicKey(new Web3JsPublicKey(body.account));
+    } catch (err) {
+      return new Response('Invalid "account" provided', {
+        status: 400,
+        headers: ACTIONS_CORS_HEADERS,
+      });
+    }
+
+    const umi = createUmi(process.env.SOLANA_RPC! || clusterApiUrl("devnet")).use(mplCore());
+
+    const asset = generateSigner(umi);
+    const tx = create(umi, {
+      asset,
+      payer: createNoopSigner(account),
+      owner: account,
+      name: "Nuke Foot Cockroach",
+      uri: "www.example.com",
+    }).setBlockhash(await umi.rpc.getLatestBlockhash()).setFeePayer(createNoopSigner(account)).build(umi);
+
+    let transaction = toWeb3JsLegacyTransaction(tx);
+
+    // set the end user as the fee payer
+    // transaction.feePayer = toWeb3JsPublicKey(account);
+
+    // transaction.recentBlockhash = (await umi.rpc.getLatestBlockhash()).blockhash;
+
+    const payload: ActionPostResponse = await createPostResponse({
+      fields: {
+        transaction,
+        message: "Play Nuke Foot Cockroach",
+      },
+      signers: [toWeb3JsKeypair(asset)],
+    });
+
+    return Response.json(payload, {
+      headers: ACTIONS_CORS_HEADERS,
+    });
+  } catch (err) {
+    console.log(err);
+    let message = "An unknown error occurred";
+    if (typeof err == "string") message = err;
+    return new Response(message, {
+      status: 400,
+      headers: ACTIONS_CORS_HEADERS,
+    });
+  }
+};
