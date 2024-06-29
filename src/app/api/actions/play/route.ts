@@ -14,6 +14,7 @@ import {
   ComputeBudgetProgram,
   Connection,
   PublicKey as Web3JsPublicKey,
+  Keypair as Web3JsKeypair,
   Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
@@ -24,16 +25,36 @@ import {
   toWeb3JsPublicKey,
   toWeb3JsTransaction,
 } from "@metaplex-foundation/umi-web3js-adapters"
-import { createNoopSigner, generateSigner, PublicKey } from "@metaplex-foundation/umi";
+import { createNoopSigner, createSignerFromKeypair, generateSigner, publicKey, PublicKey, TransactionBuilder } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { create, mplCore } from "@metaplex-foundation/mpl-core";
+import { create, fetchAsset, fetchCollection, mplCore, update, updatePlugin } from "@metaplex-foundation/mpl-core";
+import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
+import { das } from "@metaplex-foundation/mpl-core-das";
+
+const CHOICES = ["nuke", "foot", "cockroach"];
 
 export const GET = async (req: Request) => {
   const payload: ActionGetResponse = {
     title: "Play Nuke Foot Cockroach",
     icon: new URL("/nuke-foot-cockroach.png", new URL(req.url).origin).toString(),
     description: "Mint an NFT to participate in this deadly twist on Rock Paper Scissors. If you win, you get to play again. If you lose, you die and the NFT is burned.",
-    label: "Mint & Play",
+    label: "Mint",
+    links: {
+      "actions": [
+        {
+          "label": "Nuke", // button text
+          "href": "/api/actions/play?choice=nuke"
+        },
+        {
+          "label": "Foot", // button text
+          "href": "/api/actions/play?choice=foot"
+        },
+        {
+          "label": "Cockroach", // button text
+          "href": "/api/actions/play?choice=cockroach"
+        }
+      ],
+    },
   };
 
   return Response.json(payload, {
@@ -47,6 +68,9 @@ export const OPTIONS = GET;
 
 export const POST = async (req: Request) => {
   try {
+    const requestUrl = new URL(req.url);
+    const choice = requestUrl.searchParams.get("choice");
+
     const body: ActionPostRequest = await req.json();
 
     let account: PublicKey;
@@ -59,16 +83,65 @@ export const POST = async (req: Request) => {
       });
     }
 
-    const umi = createUmi(process.env.SOLANA_RPC! || clusterApiUrl("devnet")).use(mplCore());
+    const umi = createUmi(process.env.SOLANA_RPC! || clusterApiUrl("devnet")).use(mplCore()).use(dasApi());
+    const kp = umi.eddsa.createKeypairFromSecretKey(Uint8Array.from(JSON.parse(process.env.AUTH_KEY!)));
+    const signer = createSignerFromKeypair(umi, kp);
+    console.log(signer.publicKey);
 
-    const asset = generateSigner(umi);
-    const tx = create(umi, {
-      asset,
-      payer: createNoopSigner(account),
-      owner: account,
-      name: "Nuke Foot Cockroach",
-      uri: "www.example.com",
-    }).setBlockhash(await umi.rpc.getLatestBlockhash()).setFeePayer(createNoopSigner(account)).build(umi);
+    const assets = await das.getAssetsByOwner(umi, { owner: account });
+    console.log(assets);
+
+    let gameAsset = assets.find(asset => asset.updateAuthority.type === "Collection" &&
+      asset.updateAuthority.address == publicKey("5GFo42AMrH5PdEge5DYQZN2ih98UK8iv4PYtGk6kCiHr") &&
+      asset.name !== "Dead");
+
+    let builder = new TransactionBuilder();
+    let signers: Web3JsKeypair[] = [];
+
+    if (gameAsset === undefined) {
+      const asset = generateSigner(umi);
+      signers.push(toWeb3JsKeypair(asset));
+      builder = builder.add(create(umi, {
+        asset,
+        collection: await fetchCollection(umi, publicKey("5GFo42AMrH5PdEge5DYQZN2ih98UK8iv4PYtGk6kCiHr")),
+        payer: createNoopSigner(account),
+        authority: signer,
+        owner: account,
+        name: "Nuke Foot Cockroach",
+        uri: "https://death.breadheads.io/nuke-foot-cockroach.json",
+      }));
+
+      gameAsset = await fetchAsset(umi, asset.publicKey);
+    }
+
+    const cpuChoice = CHOICES[Math.floor(Math.random() * CHOICES.length)];
+
+    // If the player wins, increment the wins counter.
+    if ((choice === "nuke" && cpuChoice === "foot") ||
+      (choice === "foot" && cpuChoice === "cockroach") ||
+      (choice === "cockroach" && cpuChoice === "nuke")) {
+      const wins = parseInt(gameAsset.attributes?.attributeList[0].value!);
+      builder = builder.add(updatePlugin(umi, {
+        asset: gameAsset.publicKey,
+        collection: publicKey("5GFo42AMrH5PdEge5DYQZN2ih98UK8iv4PYtGk6kCiHr"),
+        authority: signer,
+        plugin: { type: "Attributes", attributeList: [{ key: "Wins", value: (wins + 1).toString() }] }
+      }));
+    }
+    // If the player loses, update the Asset for death.
+    else if ((choice === "foot" && cpuChoice === "nuke") ||
+      (choice === "cockroach" && cpuChoice === "foot") ||
+      (choice === "nuke" && cpuChoice === "cockroach")) {
+      builder = builder.add(update(umi, {
+        asset: gameAsset,
+        collection: await fetchCollection(umi, publicKey("5GFo42AMrH5PdEge5DYQZN2ih98UK8iv4PYtGk6kCiHr")),
+        authority: signer,
+        name: "Dead",
+        uri: "https://death.breadheads.io/ded.json",
+      }));
+    }
+
+    const tx = builder.setBlockhash(await umi.rpc.getLatestBlockhash()).setFeePayer(createNoopSigner(account)).build(umi);
 
     let transaction = toWeb3JsLegacyTransaction(tx);
 
@@ -82,7 +155,7 @@ export const POST = async (req: Request) => {
         transaction,
         message: "Play Nuke Foot Cockroach",
       },
-      signers: [toWeb3JsKeypair(asset)],
+      signers,
     });
 
     return Response.json(payload, {
