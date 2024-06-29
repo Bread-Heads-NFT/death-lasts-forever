@@ -1,12 +1,12 @@
 {
     "name": "Nuke Foot Cockroach",
     "description": "Play Nuke-Foot-Cockroach and determine your fate. A deadly twist on Rock Paper Scissors.",
-    "image": "",
+    "image": "https://death.breadheads.io/nuke-foot-cockroach.png",
     "external_url": "https://breadheads.io",
     "properties": {
         "files": [
             {
-                "uri": "",
+                "uri": "https://death.breadheads.io/nuke-foot-cockroach.png",
                 "type": "image/png"
             }
         ],
