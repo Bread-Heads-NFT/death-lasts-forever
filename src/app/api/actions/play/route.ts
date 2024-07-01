@@ -11,19 +11,13 @@ import {
 } from "@solana/actions";
 import {
   clusterApiUrl,
-  ComputeBudgetProgram,
-  Connection,
   PublicKey as Web3JsPublicKey,
   Keypair as Web3JsKeypair,
-  Transaction,
-  TransactionInstruction,
 } from "@solana/web3.js";
 import {
   fromWeb3JsPublicKey,
   toWeb3JsKeypair,
   toWeb3JsLegacyTransaction,
-  toWeb3JsPublicKey,
-  toWeb3JsTransaction,
 } from "@metaplex-foundation/umi-web3js-adapters"
 import { createNoopSigner, createSignerFromKeypair, generateSigner, publicKey, PublicKey, sol, TransactionBuilder } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
@@ -111,6 +105,7 @@ export const POST = async (req: Request) => {
       console.log("Creating new asset");
       const asset = generateSigner(umi);
       signers.push(toWeb3JsKeypair(asset));
+      signers.push(toWeb3JsKeypair(signer));
       builder = builder.add(create(umi, {
         asset,
         collection: await fetchCollection(umi, publicKey("5GFo42AMrH5PdEge5DYQZN2ih98UK8iv4PYtGk6kCiHr")),
@@ -139,6 +134,10 @@ export const POST = async (req: Request) => {
         authority: signer,
         plugin: { type: "Attributes", attributeList: [{ key: "Wins", value: (wins + 1).toString() }] }
       }));
+
+      if (!signers.includes(toWeb3JsKeypair(signer))) {
+        signers.push(toWeb3JsKeypair(signer));
+      }
     }
     // If the player loses, update the Asset for death.
     else if ((choice === "foot" && cpuChoice === "nuke") ||
@@ -153,6 +152,10 @@ export const POST = async (req: Request) => {
         name: "Dead",
         uri: "https://death.breadheads.io/ded.json",
       }));
+
+      if (!signers.includes(toWeb3JsKeypair(signer))) {
+        signers.push(toWeb3JsKeypair(signer));
+      }
     }
 
     console.log(builder.getInstructions());
