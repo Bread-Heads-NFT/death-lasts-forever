@@ -1,0 +1,15 @@
+{
+    "name": "Dead",
+    "description": "You have died, feel free to play again!",
+    "image": "https://death.breadheads.io/ded.png",
+    "external_url": "https://breadheads.io",
+    "properties": {
+        "files": [
+            {
+                "uri": "https://death.breadheads.io/ded.png",
+                "type": "image/png"
+            }
+        ],
+        "category": "image"
+    }
+}
