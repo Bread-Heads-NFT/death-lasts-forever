@@ -27,7 +27,7 @@ import {
 } from "@metaplex-foundation/umi-web3js-adapters"
 import { createNoopSigner, createSignerFromKeypair, generateSigner, publicKey, PublicKey, sol, TransactionBuilder } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { create, fetchAsset, fetchCollection, mplCore, update, updatePlugin } from "@metaplex-foundation/mpl-core";
+import { AttributesPlugin, create, fetchAsset, fetchCollection, mplCore, update, updatePlugin } from "@metaplex-foundation/mpl-core";
 import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
 import { das } from "@metaplex-foundation/mpl-core-das";
 import { mplToolbox, transferSol } from "@metaplex-foundation/mpl-toolbox";
@@ -95,7 +95,7 @@ export const POST = async (req: Request) => {
     const assets = await das.getAssetsByOwner(umi, { owner: account });
     console.log(assets);
 
-    let gameAsset = assets.find(asset => asset.updateAuthority.type === "Collection" &&
+    let gameAsset: { publicKey: PublicKey, owner: PublicKey, attributes?: AttributesPlugin } | undefined = assets.find(asset => asset.updateAuthority.type === "Collection" &&
       asset.updateAuthority.address == publicKey("5GFo42AMrH5PdEge5DYQZN2ih98UK8iv4PYtGk6kCiHr") &&
       asset.name !== "Dead");
 
@@ -121,7 +121,7 @@ export const POST = async (req: Request) => {
         uri: "https://death.breadheads.io/nuke-foot-cockroach.json",
       }));
 
-      gameAsset = await fetchAsset(umi, asset.publicKey);
+      gameAsset = { publicKey: asset.publicKey, owner: userSigner.publicKey, attributes: { authority: { type: "UpdateAuthority" }, attributeList: [{ key: "Wins", value: "0" }] } };
     }
 
     const cpuChoice = CHOICES[Math.floor(Math.random() * CHOICES.length)];
