@@ -114,6 +114,7 @@ export const POST = async (req: Request) => {
         owner: account,
         name: "Nuke Foot Cockroach",
         uri: "https://death.breadheads.io/nuke-foot-cockroach.json",
+        plugins: [{ type: "Attributes", attributeList: [{ key: "Wins", value: "0" }] }],
       }));
 
       gameAsset = { publicKey: asset.publicKey, owner: userSigner.publicKey, attributes: { authority: { type: "UpdateAuthority" }, attributeList: [{ key: "Wins", value: "0" }] } };
