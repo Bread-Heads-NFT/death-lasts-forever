@@ -162,6 +162,7 @@ export const POST = async (req: Request) => {
     console.log(builder.getInstructions());
 
     const tx = builder.setBlockhash(await umi.rpc.getLatestBlockhash()).setFeePayer(userSigner).build(umi);
+    console.log(signers);
 
     let transaction = toWeb3JsLegacyTransaction(tx);
 
